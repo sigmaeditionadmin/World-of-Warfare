@@ -65,6 +65,10 @@ button {
     padding:4px 6px;
     font-size:10px;
 }
+#turn-info {
+    padding:5px;
+    font-size:14px;
+}
 </style>
 </head>
 <body>
@@ -77,6 +81,7 @@ button {
 <div id="main">
     <div>
         <button onclick="resetGame()">Reset Game</button>
+        <span id="turn-info">Turn: 1 | Alliances used: 0/2</span>
     </div>
     <div id="map"></div>
 </div>
@@ -88,6 +93,7 @@ let allianceRequests = 0; // Count alliances used this turn
 
 const map = document.getElementById("map");
 const log = document.getElementById("log");
+const turnInfo = document.getElementById("turn-info");
 let kingdoms = [];
 let currentActionButtons = null;
 
@@ -104,6 +110,7 @@ function generateMap() {
         });
     }
     allianceRequests = 0;
+    updateTurnInfo();
 }
 
 // Draw kingdoms on the map
@@ -151,7 +158,7 @@ function handleKingdomClick(k, div){
             return;
         }
 
-        // Show action buttons for this enemy
+        // Show action buttons above kingdom
         const btnContainer = document.createElement("div");
         btnContainer.className = "action-btns";
 
@@ -172,7 +179,9 @@ function handleKingdomClick(k, div){
         }
 
         btnContainer.appendChild(attackBtn);
-        btnContainer.appendChild(allianceBtn);
+        if(allianceRequests < 2){
+            btnContainer.appendChild(allianceBtn);
+        }
         div.appendChild(btnContainer);
         currentActionButtons = btnContainer;
     }
@@ -214,6 +223,10 @@ function attackSingleTurn(attackerKingdoms, defender){
 
     // After player attack, AI attacks once
     enemyTurn();
+
+    // Reset alliances for next turn
+    allianceRequests = 0;
+    updateTurnInfo();
 }
 
 // Player requests alliance with enemy kingdom
@@ -228,9 +241,8 @@ function requestAlliance(enemyKingdom){
     }
 
     drawMap();
-
-    // After alliance attempt, AI attacks once
-    enemyTurn();
+    updateTurnInfo();
+    // Do NOT call enemyTurn here, player can still act
 }
 
 // AI attacks once (less powerful)
@@ -295,9 +307,15 @@ function addLog(text){
     log.scrollTop=log.scrollHeight;
 }
 
+// Update turn info text
+function updateTurnInfo(){
+    turnInfo.innerText = "Turn: "+turn+" | Alliances used: "+allianceRequests+"/2";
+}
+
 // Initialize game
 generateMap();
 drawMap();
+updateTurnInfo();
 </script>
 
 </body>
