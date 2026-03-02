@@ -65,7 +65,6 @@ button {
 
 <div id="main">
     <div>
-        <button onclick="endTurn()">End Turn</button>
         <button onclick="resetGame()">Reset Game</button>
     </div>
     <div id="map"></div>
@@ -74,19 +73,18 @@ button {
 <script>
 let selectedKingdoms = [];
 let turn = 1;
-let attackCount = 0; // counts attacks per turn
-const maxAttacksPerTurn = 2; // limit of attacks
 
 const map = document.getElementById("map");
 const log = document.getElementById("log");
 let kingdoms = [];
 
+// Generate random map with kingdoms
 function generateMap() {
     kingdoms = [];
     for(let i=0;i<12;i++){
         kingdoms.push({
             id:i,
-            x:Math.random()*80, // smaller to fit map
+            x:Math.random()*80, 
             y:Math.random()*80,
             troops:30+Math.floor(Math.random()*20),
             owner:i===0?"player":"enemy"
@@ -94,6 +92,7 @@ function generateMap() {
     }
 }
 
+// Draw kingdoms on the map
 function drawMap(){
     map.innerHTML="";
     kingdoms.forEach(k=>{
@@ -112,6 +111,7 @@ function drawMap(){
     });
 }
 
+// Player selects a kingdom or attacks an enemy
 function selectKingdom(k){
     if(k.owner==="player"){
         if(selectedKingdoms.includes(k)){
@@ -124,13 +124,14 @@ function selectKingdom(k){
         drawMap();
     }
     else if(k.owner==="enemy" && selectedKingdoms.length > 0){
-        attackMultiple(selectedKingdoms, k);
+        attackSingleTurn(selectedKingdoms, k);
     }
 }
 
-function attackMultiple(attackers, defender){
+// Player attacks one enemy, then AI attacks once
+function attackSingleTurn(attackerKingdoms, defender){
     let totalAttackPower = 0;
-    attackers.forEach(attacker => {
+    attackerKingdoms.forEach(attacker => {
         let attackRoll = (Math.random()*0.4 + 0.8);
         totalAttackPower += attacker.troops * attackRoll;
     });
@@ -145,14 +146,14 @@ function attackMultiple(attackers, defender){
 
     if(totalAttackPower > defendPower){
         addLog("✅ You conquered the kingdom!");
-        attackers.forEach(attacker => {
+        attackerKingdoms.forEach(attacker => {
             attacker.troops = Math.floor(attacker.troops * 0.6);
         });
         defender.owner = "player";
         defender.troops = Math.floor(totalAttackPower * 0.5);
     } else {
         addLog("❌ You lost the battle!");
-        attackers.forEach(attacker => {
+        attackerKingdoms.forEach(attacker => {
             attacker.troops = Math.floor(attacker.troops * 0.5);
         });
     }
@@ -161,48 +162,39 @@ function attackMultiple(attackers, defender){
     drawMap();
     checkWin();
 
-    // Increment attack count
-    attackCount++;
-    if(attackCount >= maxAttacksPerTurn){
-        addLog("⏳ You attacked 2 enemies, your turn ends!");
-        endTurn(); // automatically end turn
-        attackCount = 0; // reset for next turn
+    // After player attack, enemy attacks once
+    enemyTurn();
+}
+
+// AI attacks once
+function enemyTurn(){
+    let enemies = kingdoms.filter(k=>k.owner==="enemy");
+    let players = kingdoms.filter(k=>k.owner==="player");
+    if(enemies.length===0 || players.length===0) return;
+
+    let enemy = enemies[Math.floor(Math.random()*enemies.length)];
+    let target = players[Math.floor(Math.random()*players.length)];
+
+    let attackPower = enemy.troops*(Math.random()*0.4+0.8);
+    let defendPower = target.troops*(Math.random()*0.4+0.8);
+
+    addLog("💀 Enemy attacks your kingdom!");
+
+    if(attackPower > defendPower){
+        enemy.troops = Math.floor(enemy.troops*0.6);
+        target.owner = "enemy";
+        target.troops = Math.floor(enemy.troops*0.8);
+        addLog("💀 Enemy conquered one of your kingdoms!");
     } else {
-        addLog("⚡ Attacks left this turn: " + (maxAttacksPerTurn - attackCount));
+        enemy.troops = Math.floor(enemy.troops*0.5);
+        addLog("🛡 Your kingdom held!");
     }
-}
 
-function endTurn(){
-    attackCount = 0; // reset attacks for new turn
-    turn++;
-    addLog("— Turn "+turn+" —");
-
-    kingdoms.forEach(k=>{ k.troops += 5; });
-
-    kingdoms.filter(k=>k.owner==="enemy").forEach(enemy=>{
-        let targets=kingdoms.filter(k=>k.owner==="player");
-        if(targets.length===0) return;
-
-        if(Math.random()<0.35){
-            let target=targets[Math.floor(Math.random()*targets.length)];
-            let attackPower=enemy.troops*(Math.random()*0.4+0.8);
-            let defendPower=target.troops*(Math.random()*0.4+0.8);
-
-            if(attackPower>defendPower){
-                enemy.troops=Math.floor(enemy.troops*0.6);
-                target.owner="enemy";
-                target.troops=Math.floor(enemy.troops*0.8);
-                addLog("💀 Enemy conquered one of your kingdoms!");
-            } else {
-                enemy.troops=Math.floor(enemy.troops*0.5);
-            }
-        }
-    });
-
-    checkWin();
     drawMap();
+    checkWin();
 }
 
+// Check if player or AI has won
 function checkWin(){
     let playerCount=kingdoms.filter(k=>k.owner==="player").length;
     let enemyCount=kingdoms.filter(k=>k.owner==="enemy").length;
@@ -215,9 +207,9 @@ function checkWin(){
     }
 }
 
+// Reset the game
 function resetGame(){
     turn=1;
-    attackCount=0;
     selectedKingdoms=[];
     log.innerHTML="<h2>👑 Iron Crown</h2><h3>Battle Log</h3>";
     generateMap();
@@ -225,14 +217,16 @@ function resetGame(){
     addLog("Game Reset. New world generated!");
 }
 
+// Add log messages
 function addLog(text){
     log.innerHTML += text+"<br>";
     log.scrollTop=log.scrollHeight;
 }
 
+// Initialize game
 generateMap();
 drawMap();
 </script>
 
 </body>
-</html> 
+</html>
