@@ -81,7 +81,7 @@ button {
 <div id="main">
     <div>
         <button onclick="resetGame()">Reset Game</button>
-        <span id="turn-info">Turn: 1 | Alliances used: 0/2</span>
+        <span id="turn-info">Turn: 1 | Attacks this turn: 0/2 | Allies: 0/2</span>
     </div>
     <div id="map"></div>
 </div>
@@ -89,7 +89,8 @@ button {
 <script>
 let selectedKingdoms = [];
 let turn = 1;
-let allianceRequests = 0; // Count alliances used this turn
+let attacksThisTurn = 0;  // Attacks this turn
+let totalAlliancesFormed = 0; // Maximum 2 allies for the whole game
 
 const map = document.getElementById("map");
 const log = document.getElementById("log");
@@ -109,7 +110,15 @@ function generateMap() {
             owner:i===0?"player":"enemy"
         });
     }
-    allianceRequests = 0;
+    startTurn();
+    drawMap();
+    addLog("Game started! Your turn begins.");
+}
+
+// Start a new turn
+function startTurn() {
+    selectedKingdoms = [];
+    attacksThisTurn = 0;
     updateTurnInfo();
 }
 
@@ -151,14 +160,6 @@ function handleKingdomClick(k, div){
         drawMap();
     }
     else if(k.owner==="enemy" && selectedKingdoms.length > 0){
-        // If 2 alliances already requested, force attack
-        if(allianceRequests >= 2){
-            addLog("⚠ You have used 2 alliances, you must attack!");
-            attackSingleTurn(selectedKingdoms, k);
-            return;
-        }
-
-        // Show action buttons above kingdom
         const btnContainer = document.createElement("div");
         btnContainer.className = "action-btns";
 
@@ -169,26 +170,29 @@ function handleKingdomClick(k, div){
             attackSingleTurn(selectedKingdoms, k);
             btnContainer.remove();
         }
-
-        const allianceBtn = document.createElement("button");
-        allianceBtn.innerText = "Alliance";
-        allianceBtn.onclick = (e)=>{
-            e.stopPropagation();
-            requestAlliance(k);
-            btnContainer.remove();
-        }
-
         btnContainer.appendChild(attackBtn);
-        if(allianceRequests < 2){
+
+        // Only show Alliance button if <2 total allies
+        if(totalAlliancesFormed < 2){
+            const allianceBtn = document.createElement("button");
+            allianceBtn.innerText = "Alliance";
+            allianceBtn.onclick = (e)=>{
+                e.stopPropagation();
+                requestAlliance(k);
+                btnContainer.remove();
+            }
             btnContainer.appendChild(allianceBtn);
         }
+
         div.appendChild(btnContainer);
         currentActionButtons = btnContainer;
     }
 }
 
-// Player attacks one enemy, then AI attacks once
+// Player attacks one enemy
 function attackSingleTurn(attackerKingdoms, defender){
+    attacksThisTurn++;
+
     let totalAttackPower = 0;
     attackerKingdoms.forEach(attacker => {
         let attackRoll = (Math.random()*0.4 + 0.8);
@@ -221,31 +225,43 @@ function attackSingleTurn(attackerKingdoms, defender){
     drawMap();
     checkWin();
 
-    // After player attack, AI attacks once
-    enemyTurn();
+    // If 2 attacks done, auto end turn
+    if(attacksThisTurn >= 2){
+        addLog("✅ You have completed 2 attacks this turn. Turn ends.");
+        endTurn();
+    } else {
+        // After player attack, AI attacks once
+        enemyTurn();
+    }
 
-    // Reset alliances for next turn
-    allianceRequests = 0;
     updateTurnInfo();
 }
 
-// Player requests alliance with enemy kingdom
+// Player requests alliance
 function requestAlliance(enemyKingdom){
-    allianceRequests++;
+    if(totalAlliancesFormed >= 2){
+        addLog("⚠ You cannot make more alliances! Already 2 allies.");
+        return;
+    }
+
     let chance = Math.random();
-    if(chance <= 0.25){ // 25% chance success
+    if(chance <= 0.25){
         enemyKingdom.owner = "player";
+        totalAlliancesFormed++;
         addLog("🤝 Alliance successful! Kingdom joined you.");
+
+        if(totalAlliancesFormed >= 2){
+            addLog("⚠ You now have 2 allies. No more alliances allowed for the rest of the game.");
+        }
     } else {
-        addLog("❌ Alliance rejected! You can still act this turn unless you have requested 2 alliances.");
+        addLog("❌ Alliance rejected!");
     }
 
     drawMap();
     updateTurnInfo();
-    // Do NOT call enemyTurn here, player can still act
 }
 
-// AI attacks once (less powerful)
+// AI attacks once
 function enemyTurn(){
     let enemies = kingdoms.filter(k=>k.owner==="enemy");
     let players = kingdoms.filter(k=>k.owner==="player");
@@ -254,12 +270,11 @@ function enemyTurn(){
     let enemy = enemies[Math.floor(Math.random()*enemies.length)];
     let target = players[Math.floor(Math.random()*players.length)];
 
-    // AI weaker multipliers
-    let attackPower = enemy.troops * (Math.random()*0.3 + 0.8); // 0.8-1.1
-    let defendPower = target.troops * (Math.random()*0.5 + 0.75); // 0.75-1.25
+    let attackPower = enemy.troops * (Math.random()*0.3 + 0.8);
+    let defendPower = target.troops * (Math.random()*0.5 + 0.75);
 
-    let successChance = 0.4 + (attackPower - defendPower)/100; // base 40%
-    successChance = Math.min(Math.max(successChance,0.1),0.8); // clamp 10%-80%
+    let successChance = 0.4 + (attackPower - defendPower)/100;
+    successChance = Math.min(Math.max(successChance,0.1),0.8);
 
     addLog("💀 Enemy attacks your kingdom!");
 
@@ -277,10 +292,10 @@ function enemyTurn(){
     checkWin();
 }
 
-// Check if player or AI has won
+// Check win condition
 function checkWin(){
-    let playerCount=kingdoms.filter(k=>k.owner==="player").length;
-    let enemyCount=kingdoms.filter(k=>k.owner==="enemy").length;
+    let playerCount = kingdoms.filter(k=>k.owner==="player").length;
+    let enemyCount = kingdoms.filter(k=>k.owner==="enemy").length;
 
     if(enemyCount===0){
         alert("🏆 You conquered the world!");
@@ -290,26 +305,34 @@ function checkWin(){
     }
 }
 
+// End turn
+function endTurn(){
+    turn++;
+    startTurn();
+    enemyTurn();
+}
+
 // Reset the game
 function resetGame(){
     turn=1;
     selectedKingdoms=[];
-    allianceRequests = 0;
+    attacksThisTurn = 0;
+    totalAlliancesFormed = 0;
     log.innerHTML="<h2>👑 Iron Crown</h2><h3>Battle Log</h3>";
     generateMap();
     drawMap();
     addLog("Game Reset. New world generated!");
 }
 
-// Add log messages
+// Add messages to log
 function addLog(text){
     log.innerHTML += text+"<br>";
     log.scrollTop=log.scrollHeight;
 }
 
-// Update turn info text
+// Update turn info
 function updateTurnInfo(){
-    turnInfo.innerText = "Turn: "+turn+" | Alliances used: "+allianceRequests+"/2";
+    turnInfo.innerText = "Turn: "+turn+" | Attacks this turn: "+attacksThisTurn+"/2 | Allies: "+totalAlliancesFormed+"/2";
 }
 
 // Initialize game
