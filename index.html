@@ -1,326 +1,228 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Iron Crown 👑 - AI Damage & Arrowheads</title>
+<title>Iron Crown</title>
 <style>
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    display: flex;
-    height: 100vh;
-  }
-  #battleLog {
-    width: 250px;
-    background-color: #1e1e1e;
-    color: #fff;
-    padding: 10px;
-    overflow-y: auto;
-    box-sizing: border-box;
-  }
-  #gameContainer {
-    flex-grow: 1;
-    position: relative;
-    background-color: #3CB371;
-    overflow: hidden;
-  }
-  #statsBar {
-    width: 250px;
-    background-color: #333;
-    color: #fff;
-    padding: 10px;
-    box-sizing: border-box;
-  }
-  canvas {
-    position: absolute;
-    left: 0;
-    top: 0;
-  }
-  .kingdom {
-    width: 50px;
-    height: 50px;
-    position: absolute;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    cursor: pointer;
-    text-align: center;
-    border: 2px solid #000;
-    border-radius: 10px;
-    font-size: 20px;
-    text-shadow: 1px 1px 2px #000;
-    box-shadow: 0 0 5px rgba(0,0,0,0.5);
-  }
-  .player { background-color: yellow; color: #000; }
-  .ally { background-color: blue; color: #fff; }
-  .enemy { background-color: red; color: #fff; }
-  .retreated { background-color: grey; color: #fff; }
-  .actionButton {
-    position: absolute;
-    padding: 5px 10px;
-    background-color: #fff;
-    border: 1px solid #000;
-    cursor: pointer;
-    z-index: 10;
-  }
+body {
+  margin:0;
+  background:#111;
+  overflow:hidden;
+  font-family:sans-serif;
+  color:white;
+}
+
+#log {
+  position:absolute;
+  right:0;
+  top:0;
+  width:260px;
+  height:60%;
+  overflow-y:auto;
+  background:#1a1a1a;
+  padding:10px;
+  box-sizing:border-box;
+  border-left:2px solid #333;
+}
+
+#stats {
+  position:absolute;
+  right:0;
+  bottom:0;
+  width:260px;
+  height:40%;
+  background:#222;
+  padding:10px;
+  box-sizing:border-box;
+  border-left:2px solid #333;
+  border-top:2px solid #333;
+}
 </style>
 </head>
 <body>
-<div id="battleLog"><h3>Battle Log</h3></div>
-<div id="gameContainer">
-  <canvas id="arrowCanvas"></canvas>
-</div>
-<div id="statsBar"><h3>Stats</h3><div id="statsContent"></div></div>
+
+<canvas id="game"></canvas>
+<div id="log"></div>
+<div id="stats">Click a kingdom</div>
 
 <script>
-const battleLog = document.getElementById('battleLog');
-const gameContainer = document.getElementById('gameContainer');
-const arrowCanvas = document.getElementById('arrowCanvas');
-const statsContent = document.getElementById('statsContent');
-const ctx = arrowCanvas.getContext('2d');
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth - 260;
+canvas.height = window.innerHeight;
 
-let containerWidth = window.innerWidth - 500;
-let containerHeight = window.innerHeight;
-arrowCanvas.width = containerWidth;
-arrowCanvas.height = containerHeight;
+const logDiv = document.getElementById("log");
+const statsDiv = document.getElementById("stats");
 
-window.addEventListener('resize', () => {
-  containerWidth = window.innerWidth - 500;
-  containerHeight = window.innerHeight;
-  arrowCanvas.width = containerWidth;
-  arrowCanvas.height = containerHeight;
-  renderKingdoms();
-});
-
-function getRandomInt(min,max){return Math.floor(Math.random()*(max-min+1)+min);}
-function log(message){
-  const p = document.createElement('p');
-  p.textContent = message;
-  battleLog.appendChild(p);
-  battleLog.scrollTop = battleLog.scrollHeight;
-}
-
-let kingdoms = [];
-let attacksThisTurn = 0;
-let maxAlliances = 2;
-let allianceRequested = false;
 let arrows = [];
 
-// Place kingdom avoiding overlap
-function placeKingdom(occupied){
-  let x,y,valid=false;
-  while(!valid){
-    x = getRandomInt(50, containerWidth - 50);
-    y = getRandomInt(50, containerHeight - 50);
-    valid = true;
-    for(let k of occupied){
-      if(Math.hypot(k.x-x,k.y-y)<60){ valid=false; break; }
-    }
-  }
-  return {x,y};
+function log(msg){
+  logDiv.innerHTML += msg + "<br>";
+  logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-// Generate 12 kingdoms
-for(let i=1;i<=12;i++){
-  let owner = i===1 ? 'player' : 'enemy';
-  let pos = placeKingdom(kingdoms);
-  kingdoms.push({
-    id: i,
-    x: pos.x,
-    y: pos.y,
-    owner: owner,
-    troops: getRandomInt(30,48),
-    alliances: 0
-  });
-}
+const kingdoms = [
+  {name:"Aldor", x:200, y:200, troops:55, owner:"player"},
+  {name:"Bram", x:500, y:150, troops:30, owner:"enemy"},
+  {name:"Cairn", x:400, y:400, troops:40, owner:"enemy"},
+  {name:"Dorne", x:150, y:450, troops:35, owner:"enemy"}
+];
 
-// Draw arrows with arrowhead
-function drawArrows(){
-  ctx.clearRect(0,0,arrowCanvas.width,arrowCanvas.height);
-  arrows.forEach(a=>{
-    // main line
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  for(let k of kingdoms){
     ctx.beginPath();
-    ctx.moveTo(a.fromX+25, a.fromY+25);
-    ctx.lineTo(a.toX+25, a.toY+25);
-    ctx.strokeStyle = a.type==='ai' ? 'orange' : 'white';
-    ctx.lineWidth = 3;
+    ctx.arc(k.x,k.y,30,0,Math.PI*2);
+
+    if(k.owner==="player") ctx.fillStyle="green";
+    else if(k.owner==="enemy") ctx.fillStyle="gray";
+    else ctx.fillStyle="blue";
+
+    ctx.fill();
+    ctx.strokeStyle="black";
     ctx.stroke();
 
-    // arrowhead triangle
-    let angle = Math.atan2(a.toY - a.fromY, a.toX - a.fromX);
-    let headlen = 12;
-    ctx.beginPath();
-    ctx.moveTo(a.toX+25, a.toY+25);
-    ctx.lineTo(a.toX+25 - headlen * Math.cos(angle - Math.PI/6), 
-               a.toY+25 - headlen * Math.sin(angle - Math.PI/6));
-    ctx.lineTo(a.toX+25 - headlen * Math.cos(angle + Math.PI/6), 
-               a.toY+25 - headlen * Math.sin(angle + Math.PI/6));
-    ctx.closePath();
-    ctx.fillStyle = a.type==='ai' ? 'orange' : 'white';
-    ctx.fill();
-  });
+    ctx.fillStyle="white";
+    ctx.fillText(k.troops,k.x-10,k.y+5);
+  }
+
+  drawArrows();
 }
 
-function updateStats(){
-  let playerTroops = kingdoms.filter(k=>k.owner==='player').reduce((a,k)=>a+k.troops,0);
-  let allyTroops = kingdoms.filter(k=>k.owner==='ally').reduce((a,k)=>a+k.troops,0);
-  let enemyTroops = kingdoms.filter(k=>k.owner==='enemy').reduce((a,k)=>a+k.troops,0);
-  let totalPlayer = kingdoms.filter(k=>k.owner==='player').length;
-  let totalAllies = kingdoms.filter(k=>k.owner==='ally').length;
-  let totalEnemies = kingdoms.filter(k=>k.owner==='enemy').length;
-  statsContent.innerHTML = `
-    Player Troops: ${playerTroops} (${totalPlayer} kingdoms)<br>
-    Ally Troops: ${allyTroops} (${totalAllies} kingdoms)<br>
-    Enemy Troops: ${enemyTroops} (${totalEnemies} kingdoms)
+function drawArrows(){
+  for(let a of arrows){
+    ctx.strokeStyle = a.type==="ai" ? "orange" : "white";
+    ctx.lineWidth=3;
+
+    ctx.beginPath();
+    ctx.moveTo(a.from.x,a.from.y);
+    ctx.lineTo(a.to.x,a.to.y);
+    ctx.stroke();
+
+    // arrowhead
+    const angle = Math.atan2(a.to.y-a.from.y, a.to.x-a.from.x);
+    const size = 12;
+
+    ctx.beginPath();
+    ctx.moveTo(a.to.x, a.to.y);
+    ctx.lineTo(
+      a.to.x - size * Math.cos(angle - Math.PI/6),
+      a.to.y - size * Math.sin(angle - Math.PI/6)
+    );
+    ctx.lineTo(
+      a.to.x - size * Math.cos(angle + Math.PI/6),
+      a.to.y - size * Math.sin(angle + Math.PI/6)
+    );
+    ctx.closePath();
+    ctx.fillStyle = a.type==="ai" ? "orange" : "white";
+    ctx.fill();
+  }
+}
+
+function updateStats(k){
+  statsDiv.innerHTML = `
+    <h3>${k.name}</h3>
+    Owner: ${k.owner}<br>
+    Troops: ${k.troops}<br>
   `;
 }
 
-function renderKingdoms(){
-  gameContainer.querySelectorAll('.kingdom').forEach(k=>k.remove());
-  kingdoms.forEach(k=>{
-    const div = document.createElement('div');
-    div.className='kingdom';
-    if(k.owner==='player') div.classList.add('player');
-    else if(k.owner==='ally') div.classList.add('ally');
-    else if(k.owner==='enemy') div.classList.add('enemy');
-    else if(k.owner==='retreated') div.classList.add('retreated');
+canvas.addEventListener("click", function(e){
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
 
-    div.style.left = k.x+'px';
-    div.style.top = k.y+'px';
-    div.innerHTML = k.owner==='retreated' ? '🏰<br>0' : `🏰<br>${k.troops}`;
-    div.addEventListener('click', ()=>selectKingdom(k,div));
-    gameContainer.appendChild(div);
-  });
-  drawArrows();
-  updateStats();
-}
+  for(let k of kingdoms){
+    if(Math.hypot(mx-k.x,my-k.y)<30){
 
-function selectKingdom(k,element){
-  document.querySelectorAll('.actionButton').forEach(b=>b.remove());
-  if(k.owner==='player'||k.owner==='ally'){
-    if(k.owner!=='retreated' && k.id!==1){
-      const retreatBtn = document.createElement('button');
-      retreatBtn.className='actionButton';
-      retreatBtn.style.left = k.x+'px';
-      retreatBtn.style.top = (k.y-60)+'px';
-      retreatBtn.textContent='Retreat Home';
-      retreatBtn.onclick = ()=>retreatKingdom(k);
-      gameContainer.appendChild(retreatBtn);
+      updateStats(k);
+
+      if(k.owner!=="player"){
+        playerAttack(k);
+      }
+      break;
     }
-    return;
   }
+});
 
-  if(!allianceRequested && kingdoms.filter(kk=>kk.owner==='ally').length<maxAlliances){
-    const allianceBtn = document.createElement('button');
-    allianceBtn.className='actionButton';
-    allianceBtn.style.left = k.x+'px';
-    allianceBtn.style.top = (k.y-30)+'px';
-    allianceBtn.textContent='Alliance';
-    allianceBtn.onclick = ()=>requestAlliance(k);
-    gameContainer.appendChild(allianceBtn);
-  }
+function playerAttack(target){
+  const attacker = kingdoms.find(k=>k.owner==="player");
+  if(!attacker || attacker.troops<=1) return;
 
-  const attackBtn=document.createElement('button');
-  attackBtn.className='actionButton';
-  attackBtn.style.left = k.x+'px';
-  attackBtn.style.top = (k.y-60)+'px';
-  attackBtn.textContent='Attack';
-  attackBtn.onclick = ()=>attackKingdom(k);
-  gameContainer.appendChild(attackBtn);
+  arrows.push({from:attacker,to:target,type:"player"});
+
+  setTimeout(()=>{
+    resolveBattle(attacker,target);
+    arrows.shift();
+    draw();
+    aiTurn();
+  },1500);
 }
 
-function retreatKingdom(k){
-  const home = kingdoms.find(h => h.id === 1);
-  home.troops += k.troops;
-  k.troops = 0;
-  k.owner = 'retreated';
-  log(`Kingdom ${k.id} retreated. Troops added to home kingdom ${home.id}.`);
-  renderKingdoms();
-}
-
-function requestAlliance(k){
-  allianceRequested = true;
-  const success = Math.random() < 0.5;
-  if(success){ k.owner='ally'; log(`Alliance successful with kingdom ${k.id}`); }
-  else log(`Alliance request denied for kingdom ${k.id}`);
-  renderKingdoms();
-}
-
-function attackKingdom(k){
-  const attackers = kingdoms.filter(kk=>kk.owner==='player'||kk.owner==='ally');
-  const fromKingdom = attackers[0];
-  arrows.push({fromX:fromKingdom.x, fromY:fromKingdom.y, toX:k.x, toY:k.y, type:'player'});
-  drawArrows();
-  setTimeout(()=>{ arrows.shift(); drawArrows(); },1500);
-
-  const totalAttackers = attackers.reduce((sum, a)=>sum+a.troops, 0);
-  const successChance = totalAttackers / (totalAttackers + k.troops);
-
-  if(Math.random() < successChance){
-    k.owner='player';
-    k.troops = Math.max(10,getRandomInt(30,48));
-    log(`Attack successful! You conquered kingdom ${k.id} (Your troops: ${totalAttackers}, Enemy: ${k.troops})`);
-  } else {
-    log(`Attack failed on kingdom ${k.id} (Your troops: ${totalAttackers}, Enemy: ${k.troops})`);
-  }
-  attacksThisTurn++;
-  renderKingdoms();
-  if(attacksThisTurn>=2) endTurn();
-}
-
-// AI attacks any non-AI kingdom and deals damage
 function aiTurn(){
-  const aiKingdoms = kingdoms.filter(k=>k.owner==='enemy');
-  let possibleTargets = kingdoms.filter(k=>k.owner !== 'enemy' && k.troops > 0);
-  if(aiKingdoms.length===0 || possibleTargets.length===0) return;
+  const aiKingdoms = kingdoms.filter(k=>k.owner==="enemy");
 
   let attacks = 0;
-  const maxAttacks = 2;
 
-  while(attacks < maxAttacks && possibleTargets.length > 0){
-    const attacker = aiKingdoms[getRandomInt(0, aiKingdoms.length-1)];
-    possibleTargets.sort((a,b)=>a.troops - b.troops); // weakest first
-    const target = possibleTargets[0];
+  function nextAttack(){
+    if(attacks>=2) return;
 
-    arrows.push({fromX: attacker.x, fromY: attacker.y, toX: target.x, toY: target.y, type:'ai'});
-    drawArrows();
-    setTimeout(()=>{ arrows.shift(); drawArrows(); },1500);
+    const attacker = aiKingdoms[Math.floor(Math.random()*aiKingdoms.length)];
+    const targets = kingdoms.filter(k=>k!==attacker && k.troops>0);
 
-    // Calculate damage
-    const attackPower = Math.floor(attacker.troops * 0.5);
-    const defendPower = Math.floor(target.troops * 0.3);
-    target.troops -= attackPower;
-    attacker.troops -= defendPower;
+    if(targets.length===0) return;
 
-    if(target.troops <= 0){
-      target.owner='enemy';
-      target.troops = Math.max(5, Math.floor(attackPower * 0.7));
-      log(`AI conquered kingdom ${target.id} (Damage: ${attackPower})`);
-      possibleTargets.shift();
-    } else {
-      log(`AI attacked kingdom ${target.id} (Damage: ${attackPower}, Target left: ${target.troops})`);
-    }
+    const target = targets[Math.floor(Math.random()*targets.length)];
 
-    attacks++;
+    arrows.push({from:attacker,to:target,type:"ai"});
+
+    setTimeout(()=>{
+      resolveBattle(attacker,target);
+      arrows.shift();
+      draw();
+      attacks++;
+      nextAttack();
+    },1500);
   }
+
+  nextAttack();
 }
 
-// End turn and trigger AI
-function endTurn(){
-  attacksThisTurn=0;
-  allianceRequested=false;
-  log(`Turn ended. AI is taking its turn.`);
-  
-  aiTurn();
+function resolveBattle(attacker,target){
+  if(attacker.troops<=0 || target.troops<=0) return;
 
-  log('Your turn.');
-  renderKingdoms();
+  const attackPower = attacker.troops;
+  const defendPower = target.troops;
+
+  const winChance = attackPower/(attackPower+defendPower);
+
+  if(Math.random()<winChance){
+    const damage = Math.floor(attackPower*0.5);
+    target.troops -= damage;
+    attacker.troops -= Math.floor(defendPower*0.3);
+
+    if(target.troops<=0){
+      target.owner = attacker.owner;
+      target.troops = Math.max(5, Math.floor(attacker.troops*0.5));
+      log(attacker.name+" conquered "+target.name);
+    } else {
+      log(attacker.name+" hit "+target.name);
+    }
+  } else {
+    attacker.troops -= Math.floor(defendPower*0.4);
+    log(attacker.name+" failed attacking "+target.name);
+  }
+
+  if(attacker.troops<0) attacker.troops=0;
+  if(target.troops<0) target.troops=0;
 }
 
-// Initial render
-renderKingdoms();
+function gameLoop(){
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
 </script>
 </body>
 </html>
