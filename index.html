@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Iron Crown 👑 - Arrowheads</title>
+<title>Iron Crown 👑 - Color Blind Friendly Arrows</title>
 <style>
   body {
     margin: 0;
@@ -139,30 +139,31 @@ for(let i=1;i<=12;i++){
 function drawArrows(){
   ctx.clearRect(0,0,arrowCanvas.width,arrowCanvas.height);
   arrows.forEach(a=>{
-    // Line
+    // Main line
     ctx.beginPath();
     ctx.moveTo(a.fromX+25, a.fromY+25);
     ctx.lineTo(a.toX+25, a.toY+25);
-    ctx.strokeStyle = 'white';
+    ctx.strokeStyle = a.type==='ai' ? 'orange' : 'white';
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Arrowhead
     let angle = Math.atan2(a.toY - a.fromY, a.toX - a.fromX);
     let headlen = 10;
 
-    // Left
+    // Left side
     ctx.beginPath();
     ctx.moveTo(a.toX+25, a.toY+25);
     ctx.lineTo(a.toX+25 - headlen * Math.cos(angle - Math.PI/6), 
                a.toY+25 - headlen * Math.sin(angle - Math.PI/6));
+    ctx.strokeStyle = a.type==='ai' ? 'orange' : 'white';
     ctx.stroke();
 
-    // Right
+    // Right side
     ctx.beginPath();
     ctx.moveTo(a.toX+25, a.toY+25);
     ctx.lineTo(a.toX+25 - headlen * Math.cos(angle + Math.PI/6), 
                a.toY+25 - headlen * Math.sin(angle + Math.PI/6));
+    ctx.strokeStyle = a.type==='ai' ? 'orange' : 'white';
     ctx.stroke();
   });
 }
@@ -257,7 +258,7 @@ function requestAlliance(k){
 function attackKingdom(k){
   const attackers = kingdoms.filter(kk=>kk.owner==='player'||kk.owner==='ally');
   const fromKingdom = attackers[0];
-  arrows.push({fromX:fromKingdom.x, fromY:fromKingdom.y, toX:k.x, toY:k.y});
+  arrows.push({fromX:fromKingdom.x, fromY:fromKingdom.y, toX:k.x, toY:k.y, type:'player'});
   drawArrows();
   setTimeout(()=>{ arrows.shift(); drawArrows(); },1500);
 
@@ -284,8 +285,7 @@ function aiTurn(){
   const attacker = aiKingdoms[getRandomInt(0, aiKingdoms.length-1)];
   const target = playerKingdoms[getRandomInt(0, playerKingdoms.length-1)];
 
-  // Draw arrow
-  arrows.push({fromX: attacker.x, fromY: attacker.y, toX: target.x, toY: target.y});
+  arrows.push({fromX: attacker.x, fromY: attacker.y, toX: target.x, toY: target.y, type:'ai'});
   drawArrows();
   setTimeout(()=>{ arrows.shift(); drawArrows(); },1500);
 
