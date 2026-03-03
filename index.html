@@ -3,38 +3,38 @@
 <head>
 <title>Iron Crown</title>
 <style>
-body {
+body{
   margin:0;
-  background:#111;
+  background:#0f0f0f;
   overflow:hidden;
   font-family:sans-serif;
   color:white;
 }
 
-#log {
+#log{
   position:absolute;
   right:0;
   top:0;
   width:260px;
   height:60%;
   overflow-y:auto;
-  background:#1a1a1a;
+  background:#1c1c1c;
   padding:10px;
   box-sizing:border-box;
-  border-left:2px solid #333;
+  border-left:3px solid #333;
 }
 
-#stats {
+#stats{
   position:absolute;
   right:0;
   bottom:0;
   width:260px;
   height:40%;
-  background:#222;
-  padding:10px;
+  background:#181818;
+  padding:15px;
   box-sizing:border-box;
-  border-left:2px solid #333;
-  border-top:2px solid #333;
+  border-left:3px solid #333;
+  border-top:3px solid #333;
 }
 </style>
 </head>
@@ -47,6 +47,7 @@ body {
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+
 canvas.width = window.innerWidth - 260;
 canvas.height = window.innerHeight;
 
@@ -61,29 +62,40 @@ function log(msg){
 }
 
 const kingdoms = [
-  {name:"Aldor", x:200, y:200, troops:55, owner:"player"},
-  {name:"Bram", x:500, y:150, troops:30, owner:"enemy"},
-  {name:"Cairn", x:400, y:400, troops:40, owner:"enemy"},
-  {name:"Dorne", x:150, y:450, troops:35, owner:"enemy"}
+  {name:"Aldor", x:220, y:200, troops:55, owner:"player"},
+  {name:"Bram", x:520, y:160, troops:30, owner:"enemy"},
+  {name:"Cairn", x:450, y:420, troops:40, owner:"enemy"},
+  {name:"Dorne", x:170, y:480, troops:35, owner:"enemy"}
 ];
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   for(let k of kingdoms){
-    ctx.beginPath();
-    ctx.arc(k.x,k.y,30,0,Math.PI*2);
 
-    if(k.owner==="player") ctx.fillStyle="green";
-    else if(k.owner==="enemy") ctx.fillStyle="gray";
-    else ctx.fillStyle="blue";
+    ctx.beginPath();
+    ctx.arc(k.x,k.y,35,0,Math.PI*2);
+
+    if(k.owner==="player") ctx.fillStyle="#1db954";   // bright green
+    else if(k.owner==="enemy") ctx.fillStyle="#555";  // darker gray
+    else ctx.fillStyle="#3498db";                     // blue ally
 
     ctx.fill();
-    ctx.strokeStyle="black";
+
+    ctx.strokeStyle="#000";
+    ctx.lineWidth=3;
     ctx.stroke();
 
+    // troops number
     ctx.fillStyle="white";
-    ctx.fillText(k.troops,k.x-10,k.y+5);
+    ctx.font="bold 16px sans-serif";
+    ctx.textAlign="center";
+    ctx.fillText(k.troops,k.x,k.y+5);
+
+    // kingdom name under circle
+    ctx.font="14px sans-serif";
+    ctx.fillStyle="#ccc";
+    ctx.fillText(k.name,k.x,k.y+55);
   }
 
   drawArrows();
@@ -91,8 +103,9 @@ function draw(){
 
 function drawArrows(){
   for(let a of arrows){
+
     ctx.strokeStyle = a.type==="ai" ? "orange" : "white";
-    ctx.lineWidth=3;
+    ctx.lineWidth=4;
 
     ctx.beginPath();
     ctx.moveTo(a.from.x,a.from.y);
@@ -101,7 +114,7 @@ function drawArrows(){
 
     // arrowhead
     const angle = Math.atan2(a.to.y-a.from.y, a.to.x-a.from.x);
-    const size = 12;
+    const size = 14;
 
     ctx.beginPath();
     ctx.moveTo(a.to.x, a.to.y);
@@ -121,9 +134,10 @@ function drawArrows(){
 
 function updateStats(k){
   statsDiv.innerHTML = `
-    <h3>${k.name}</h3>
-    Owner: ${k.owner}<br>
-    Troops: ${k.troops}<br>
+    <h2>${k.name}</h2>
+    <hr>
+    <b>Owner:</b> ${k.owner}<br>
+    <b>Troops:</b> ${k.troops}
   `;
 }
 
@@ -133,7 +147,7 @@ canvas.addEventListener("click", function(e){
   const my = e.clientY - rect.top;
 
   for(let k of kingdoms){
-    if(Math.hypot(mx-k.x,my-k.y)<30){
+    if(Math.hypot(mx-k.x,my-k.y)<35){
 
       updateStats(k);
 
@@ -161,7 +175,6 @@ function playerAttack(target){
 
 function aiTurn(){
   const aiKingdoms = kingdoms.filter(k=>k.owner==="enemy");
-
   let attacks = 0;
 
   function nextAttack(){
@@ -191,15 +204,12 @@ function aiTurn(){
 function resolveBattle(attacker,target){
   if(attacker.troops<=0 || target.troops<=0) return;
 
-  const attackPower = attacker.troops;
-  const defendPower = target.troops;
-
-  const winChance = attackPower/(attackPower+defendPower);
+  const winChance = attacker.troops/(attacker.troops+target.troops);
 
   if(Math.random()<winChance){
-    const damage = Math.floor(attackPower*0.5);
+    const damage = Math.floor(attacker.troops*0.5);
     target.troops -= damage;
-    attacker.troops -= Math.floor(defendPower*0.3);
+    attacker.troops -= Math.floor(target.troops*0.3);
 
     if(target.troops<=0){
       target.owner = attacker.owner;
@@ -209,7 +219,7 @@ function resolveBattle(attacker,target){
       log(attacker.name+" hit "+target.name);
     }
   } else {
-    attacker.troops -= Math.floor(defendPower*0.4);
+    attacker.troops -= Math.floor(target.troops*0.4);
     log(attacker.name+" failed attacking "+target.name);
   }
 
