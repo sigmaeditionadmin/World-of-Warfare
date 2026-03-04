@@ -20,9 +20,7 @@ body {
     height: 100vh;
 }
 
-#map {
-    flex: 3;
-}
+#map { flex: 3; }
 
 #sidePanel {
     flex: 1;
@@ -51,9 +49,7 @@ button {
     margin-bottom: 10px;
 }
 
-button:hover {
-    background: #34495e;
-}
+button:hover { background: #34495e; }
 
 #log {
     background: black;
@@ -75,7 +71,6 @@ button:hover {
 <body>
 
 <div id="gameContainer">
-
 <div id="map"></div>
 
 <div id="sidePanel">
@@ -88,10 +83,10 @@ button:hover {
     <select id="targetSelect"></select>
 
     <label>Infantry to Send</label>
-    <input type="number" id="infantrySend" value="10">
+    <input type="number" id="infantrySend" value="10000">
 
     <label>Tanks to Send</label>
-    <input type="number" id="tankSend" value="2">
+    <input type="number" id="tankSend" value="500">
 
     <button onclick="launchAttack()">Launch Attack</button>
 
@@ -101,22 +96,19 @@ button:hover {
     <h3>📊 Global Stats</h3>
     <div id="statsPanel"></div>
 </div>
-
 </div>
 
 <script>
 let map = L.map('map').setView([20,0], 2);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 let countries = {
-    "United States of America": { owner: "player", infantry: 60, tanks: 12 },
-    "Russia": { owner: "ai", infantry: 45, tanks: 8 },
-    "China": { owner: "ai", infantry: 50, tanks: 7 },
-    "Iran": { owner: "ai", infantry: 30, tanks: 4 },
-    "North Korea": { owner: "ai", infantry: 25, tanks: 3 }
+    "United States of America": { owner: "player", infantry: 130000, tanks: 6000 },
+    "Russia": { owner: "ai", infantry: 115000, tanks: 5000 },
+    "China": { owner: "ai", infantry: 200000, tanks: 5500 },
+    "Iran": { owner: "ai", infantry: 57000, tanks: 1600 },
+    "North Korea": { owner: "ai", infantry: 120000, tanks: 4000 }
 };
 
 let geoLayer;
@@ -132,7 +124,8 @@ function log(msg) {
 }
 
 function style(feature) {
-    let name = feature.properties.name;
+    let name = feature.properties.name_en || feature.properties.name;
+
     if (countries[name]) {
         return {
             fillColor: getColor(countries[name].owner),
@@ -151,7 +144,15 @@ function refreshMap() {
 fetch("https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json")
 .then(res => res.json())
 .then(data => {
-    geoLayer = L.geoJSON(data, { style: style }).addTo(map);
+    geoLayer = L.geoJSON(data, {
+        style: style,
+        onEachFeature: function(feature, layer) {
+            let name = feature.properties.name_en || feature.properties.name;
+            if (countries[name]) {
+                layer.bindPopup(name);
+            }
+        }
+    }).addTo(map);
 });
 
 function populateDropdowns() {
@@ -190,9 +191,9 @@ function updateStats() {
 
     document.getElementById("statsPanel").innerHTML = `
         <b>Your Countries:</b> ${yourCountries}<br>
-        <b>Your Infantry:</b> ${yourInfantry}<br>
-        <b>Your Tanks:</b> ${yourTanks}<br>
-        <b>Total Power:</b> ${totalPower}<br>
+        <b>Your Infantry:</b> ${yourInfantry.toLocaleString()}<br>
+        <b>Your Tanks:</b> ${yourTanks.toLocaleString()}<br>
+        <b>Total Power:</b> ${totalPower.toLocaleString()}<br>
         <b>AI Countries Left:</b> ${aiCountries}
     `;
 }
@@ -214,8 +215,8 @@ function launchAttack() {
     attacker.infantry -= inf;
     attacker.tanks -= tanks;
 
-    let attackPower = inf + tanks*3 + Math.random()*20;
-    let defendPower = defender.infantry + defender.tanks*3 + Math.random()*20;
+    let attackPower = inf + tanks*3 + Math.random()*50000;
+    let defendPower = defender.infantry + defender.tanks*3 + Math.random()*50000;
 
     if (attackPower > defendPower) {
         log(attackerName + " captured " + targetName);
