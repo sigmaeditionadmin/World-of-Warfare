@@ -206,14 +206,13 @@ function updateStats() {
     `;
 }
 
-// Function to animate a plane or ship moving
-function animateUnit(fromCoords, toCoords, iconColor, duration=2000) {
-    let marker = L.circleMarker(fromCoords, {radius: 6, color: iconColor}).addTo(map);
+// Animate planes/ships
+function animateUnit(fromCoords, toCoords, color, duration=2000) {
+    let marker = L.circleMarker(fromCoords, {radius: 6, color: color}).addTo(map);
     let steps = 50;
     let step = 0;
     let latStep = (toCoords[0]-fromCoords[0])/steps;
     let lngStep = (toCoords[1]-fromCoords[1])/steps;
-
     let interval = setInterval(() => {
         step++;
         marker.setLatLng([fromCoords[0]+latStep*step, fromCoords[1]+lngStep*step]);
@@ -224,7 +223,46 @@ function animateUnit(fromCoords, toCoords, iconColor, duration=2000) {
     }, duration/steps);
 }
 
-function launchAttack() {
+// General attack function
+function resolveAttack(attackerName, targetName, inf, tanks, planes, ships) {
+    let attacker = countries[attackerName];
+    let defender = countries[targetName];
+    if (!attacker || !defender) return;
+
+    attacker.infantry -= inf; attacker.tanks -= tanks; attacker.planes -= planes; attacker.ships -= ships;
+
+    // Animate planes and ships
+    for (let i=0;i<planes;i+=50) animateUnit(attacker.coords, defender.coords, 'yellow', 1500);
+    for (let i=0;i<ships;i+=10) animateUnit(attacker.coords, defender.coords, 'blue', 2500);
+
+    return new Promise(resolve => {
+        setTimeout(() => {
+            let attackPower = inf + tanks*3 + planes*5 + ships*4 + Math.random()*50000;
+            let defendPower = defender.infantry + defender.tanks*3 + defender.planes*5 + defender.ships*4 + Math.random()*50000;
+            if (attackPower > defendPower) {
+                log(attackerName + " captured " + targetName);
+                defender.owner = attacker.owner;
+                defender.infantry = Math.floor(inf/2);
+                defender.tanks = Math.floor(tanks/2);
+                defender.planes = Math.floor(planes/2);
+                defender.ships = Math.floor(ships/2);
+            } else {
+                log(attackerName + " failed attacking " + targetName);
+                defender.infantry -= Math.floor(inf/3);
+                defender.tanks -= Math.floor(tanks/3);
+                defender.planes -= Math.floor(planes/3);
+                defender.ships -= Math.floor(ships/3);
+                for (let key of ["infantry","tanks","planes","ships"]) if (defender[key]<0) defender[key]=0;
+            }
+            populateDropdowns();
+            refreshMap();
+            updateStats();
+            resolve();
+        }, 2000);
+    });
+}
+
+async function launchAttack() {
     let attackerName = document.getElementById("attackerSelect").value;
     let targetName = document.getElementById("targetSelect").value;
     let inf = parseInt(document.getElementById("infantrySend").value);
@@ -241,37 +279,23 @@ function launchAttack() {
         return;
     }
 
-    attacker.infantry -= inf; attacker.tanks -= tanks; attacker.planes -= planes; attacker.ships -= ships;
+    await resolveAttack(attackerName, targetName, inf, tanks, planes, ships);
 
-    // Animate planes
-    for (let i=0;i<planes;i+=50) animateUnit(attacker.coords, defender.coords, 'yellow', 1500);
-    // Animate ships
-    for (let i=0;i<ships;i+=10) animateUnit(attacker.coords, defender.coords, 'blue', 2500);
-
-    setTimeout(() => {
-        let attackPower = inf + tanks*3 + planes*5 + ships*4 + Math.random()*50000;
-        let defendPower = defender.infantry + defender.tanks*3 + defender.planes*5 + defender.ships*4 + Math.random()*50000;
-
-        if (attackPower > defendPower) {
-            log(attackerName + " captured " + targetName);
-            defender.owner = "player";
-            defender.infantry = Math.floor(inf/2);
-            defender.tanks = Math.floor(tanks/2);
-            defender.planes = Math.floor(planes/2);
-            defender.ships = Math.floor(ships/2);
-        } else {
-            log(attackerName + " failed attacking " + targetName);
-            defender.infantry -= Math.floor(inf/3);
-            defender.tanks -= Math.floor(tanks/3);
-            defender.planes -= Math.floor(planes/3);
-            defender.ships -= Math.floor(ships/3);
-            for (let key of ["infantry","tanks","planes","ships"]) if (defender[key]<0) defender[key]=0;
+    // AI turn
+    for (let aiName in countries) {
+        let aiCountry = countries[aiName];
+        if (aiCountry.owner === "ai") {
+            let possibleTargets = Object.keys(countries).filter(n => n !== aiName);
+            let target = possibleTargets[Math.floor(Math.random()*possibleTargets.length)];
+            let t = countries[target];
+            // Send a portion of troops
+            let aiInf = Math.floor(aiCountry.infantry*0.3);
+            let aiTanks = Math.floor(aiCountry.tanks*0.3);
+            let aiPlanes = Math.floor(aiCountry.planes*0.3);
+            let aiShips = Math.floor(aiCountry.ships*0.3);
+            await resolveAttack(aiName, target, aiInf, aiTanks, aiPlanes, aiShips);
         }
-
-        populateDropdowns();
-        refreshMap();
-        updateStats();
-    }, 2000); // Attack resolves after animation
+    }
 }
 
 populateDropdowns();
