@@ -27,7 +27,8 @@ body {
     background: #111;
     padding: 15px;
     border-left: 2px solid #333;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 select, input {
@@ -51,20 +52,20 @@ button {
 
 button:hover { background: #34495e; }
 
-#log {
-    background: black;
-    padding: 8px;
-    height: 200px;
-    overflow-y: auto;
-    font-size: 12px;
-    margin-bottom: 10px;
-}
-
 #statsPanel {
     background: #0c0c0c;
     padding: 10px;
     font-size: 13px;
     border: 1px solid #333;
+    margin-bottom: 15px;
+}
+
+#log {
+    background: black;
+    padding: 8px;
+    font-size: 12px;
+    flex-grow: 1;
+    overflow-y: auto;
 }
 </style>
 </head>
@@ -90,11 +91,11 @@ button:hover { background: #34495e; }
 
     <button onclick="launchAttack()">Launch Attack</button>
 
-    <h3>Battle Log</h3>
-    <div id="log"></div>
-
     <h3>📊 Global Stats</h3>
     <div id="statsPanel"></div>
+
+    <h3>Battle Log</h3>
+    <div id="log"></div>
 </div>
 </div>
 
@@ -144,15 +145,7 @@ function refreshMap() {
 fetch("https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json")
 .then(res => res.json())
 .then(data => {
-    geoLayer = L.geoJSON(data, {
-        style: style,
-        onEachFeature: function(feature, layer) {
-            let name = feature.properties.name_en || feature.properties.name;
-            if (countries[name]) {
-                layer.bindPopup(name);
-            }
-        }
-    }).addTo(map);
+    geoLayer = L.geoJSON(data, { style: style }).addTo(map);
 });
 
 function populateDropdowns() {
