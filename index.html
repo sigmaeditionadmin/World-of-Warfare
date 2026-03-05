@@ -3,133 +3,141 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>First-Person Aircraft Shooter</title>
+<title>Aircraft Simulator - Cockpit View</title>
 <style>
-  body { margin:0; overflow:hidden; background:#87ceeb; }
-  canvas { display:block; background:#87ceeb; }
+  body { margin: 0; overflow: hidden; background: #87CEEB; }
+  canvas { display: block; }
   #hud {
-    position:absolute; top:0; left:0; width:100%; height:100%;
-    pointer-events:none; color:white; font-family:sans-serif;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: white;
+    font-family: monospace;
+    background: rgba(0,0,0,0.3);
+    padding: 8px;
+    border-radius: 5px;
   }
-  #crosshair {
-    position:absolute; top:50%; left:50%;
-    width:20px; height:20px; margin:-10px 0 0 -10px;
-    border:2px solid white; border-radius:50%;
-  }
-  #healthBarContainer {
-    position:absolute; top:10px; left:10px; width:200px; height:20px; border:2px solid white;
-  }
-  #healthBar { width:100%; height:100%; background:red; }
 </style>
 </head>
 <body>
-
-<canvas id="gameCanvas"></canvas>
-<div id="hud">
-  <div id="crosshair"></div>
-  <div id="healthBarContainer"><div id="healthBar"></div></div>
-</div>
-
+<div id="hud">Speed: 0 | Altitude: 0</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
 <script>
-// ========== Canvas Setup ==========
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
 
-window.addEventListener('resize',()=> {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-});
+let scene, camera, renderer;
+let plane, planeVelocity = 0;
+let planePitch = 0, planeRoll = 0;
+let keys = {};
+let clock = new THREE.Clock();
 
-// ========== Player ==========
-const player = {
-  x: canvas.width/2,
-  y: canvas.height - 100,
-  speed: 5,
-  health: 100,
-  bullets: []
-};
+init();
+animate();
 
-// ========== Input ==========
-const keys = {};
-document.addEventListener('keydown', e=>keys[e.code]=true);
-document.addEventListener('keyup', e=>keys[e.code]=false);
+function init() {
+  // Scene
+  scene = new THREE.Scene();
 
-// ========== Enemies ==========
-const enemies = [];
-function spawnEnemy() {
-  const enemy = {
-    x: Math.random() * canvas.width,
-    y: -50,
-    speed: 2 + Math.random()*2,
-    size: 40
-  };
-  enemies.push(enemy);
-}
+  // Camera (cockpit view)
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 
-// ========== Bullets ==========
-function shoot() {
-  player.bullets.push({x:player.x, y:player.y-20, speed:10});
-}
+  // Renderer
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-// ========== Game Loop ==========
-let lastSpawn = 0;
-function gameLoop(timestamp){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // Lighting
+  const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambient);
+  const directional = new THREE.DirectionalLight(0xffffff, 0.6);
+  directional.position.set(5, 10, 7);
+  scene.add(directional);
 
-  // Player Movement
-  if(keys['ArrowLeft'] && player.x>0) player.x -= player.speed;
-  if(keys['ArrowRight'] && player.x<canvas.width) player.x += player.speed;
-  if(keys['ArrowUp'] && player.y>0) player.y -= player.speed;
-  if(keys['ArrowDown'] && player.y<canvas.height) player.y += player.speed;
-  if(keys['Space']) shoot();
+  // Plane (placeholder)
+  const geometry = new THREE.ConeGeometry(0.5, 2, 16);
+  const material = new THREE.MeshStandardMaterial({color: 0xff0000});
+  plane = new THREE.Mesh(geometry, material);
+  plane.rotation.x = Math.PI/2; // point forward
+  scene.add(plane);
 
-  // Draw cockpit view (simple rectangle for now)
-  ctx.fillStyle = '#444';
-  ctx.fillRect(0, canvas.height-100, canvas.width, 100); // cockpit floor
+  // Ground
+  const groundGeo = new THREE.PlaneGeometry(500, 500, 10, 10);
+  const groundMat = new THREE.MeshStandardMaterial({color: 0x228B22});
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2;
+  scene.add(ground);
 
-  // Bullets
-  ctx.fillStyle = 'yellow';
-  player.bullets.forEach((b, i)=>{
-    b.y -= b.speed;
-    ctx.fillRect(b.x-2, b.y-10, 4,10);
-    if(b.y < 0) player.bullets.splice(i,1);
+  // Skybox (simple color for now)
+  scene.background = new THREE.Color(0x87CEEB);
+
+  // Window resize
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // Spawn Enemies
-  if(timestamp - lastSpawn > 1000) { spawnEnemy(); lastSpawn = timestamp; }
-
-  // Move & Draw Enemies
-  ctx.fillStyle='red';
-  enemies.forEach((e, i)=>{
-    e.y += e.speed;
-    ctx.fillRect(e.x-e.size/2, e.y-e.size/2, e.size, e.size);
-
-    // Collision with bullets
-    player.bullets.forEach((b,j)=>{
-      if(b.x > e.x-e.size/2 && b.x < e.x+e.size/2 &&
-         b.y > e.y-e.size/2 && b.y < e.y+e.size/2){
-        enemies.splice(i,1);
-        player.bullets.splice(j,1);
-      }
-    });
-
-    // Enemy reaches player
-    if(e.y+e.size/2 > canvas.height-100){
-      player.health -= 10;
-      enemies.splice(i,1);
-    }
-  });
-
-  // Update HUD
-  document.getElementById('healthBar').style.width = player.health + '%';
-
-  requestAnimationFrame(gameLoop);
+  // Keyboard
+  window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 }
 
-requestAnimationFrame(gameLoop);
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+
+  handleControls(delta);
+  updateCamera();
+  updateHUD();
+
+  renderer.render(scene, camera);
+}
+
+function handleControls(delta) {
+  const throttleSpeed = 20;
+  const pitchSpeed = Math.PI; // rad/s
+  const rollSpeed = Math.PI; // rad/s
+
+  // Throttle
+  if(keys['KeyW']) planeVelocity += throttleSpeed * delta;
+  if(keys['KeyS']) planeVelocity -= throttleSpeed * delta;
+  planeVelocity = Math.max(0, planeVelocity);
+
+  // Pitch
+  if(keys['ArrowUp']) planePitch += pitchSpeed * delta;
+  if(keys['ArrowDown']) planePitch -= pitchSpeed * delta;
+
+  // Roll
+  if(keys['KeyA']) planeRoll += rollSpeed * delta;
+  if(keys['KeyD']) planeRoll -= rollSpeed * delta;
+
+  // Apply rotation
+  plane.rotation.z = planeRoll;
+  plane.rotation.x = Math.PI/2 + planePitch;
+
+  // Move forward along local plane direction
+  const forward = new THREE.Vector3(0, 0, -1);
+  forward.applyEuler(plane.rotation);
+  plane.position.add(forward.multiplyScalar(planeVelocity * delta));
+}
+
+function updateCamera() {
+  // Cockpit camera: slightly behind nose
+  const offset = new THREE.Vector3(0, 0.2, 0.5);
+  offset.applyEuler(plane.rotation);
+  camera.position.copy(plane.position).add(offset);
+
+  // Look forward along plane
+  const lookAt = new THREE.Vector3(0, 0, -10);
+  lookAt.applyEuler(plane.rotation);
+  lookAt.add(plane.position);
+  camera.lookAt(lookAt);
+}
+
+function updateHUD() {
+  const hud = document.getElementById('hud');
+  hud.innerText = `Speed: ${planeVelocity.toFixed(1)} | Altitude: ${plane.position.y.toFixed(1)}`;
+}
+
 </script>
-
 </body>
 </html>
