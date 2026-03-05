@@ -1,352 +1,271 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>World of Warfare – Global Conflict</title>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
+<title>Aircraft Fighter Simulator</title>
 <style>
-
-body{
-  margin:0;
-  display:flex;
-  height:100vh;
-  font-family:Arial;
-  overflow:hidden;
+body {
+  margin: 0;
+  overflow: hidden;
+  background: linear-gradient(to top, #87CEEB, #ffffff);
+  font-family: Arial;
 }
-
-#map{
-  flex:1;
+canvas {
+  display: block;
 }
-
-#panel{
-  width:320px;
-  background:#111;
-  color:white;
-  display:flex;
-  flex-direction:column;
+#ui {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: white;
+  font-weight: bold;
 }
-
-#tabs{
-  display:flex;
-  background:#222;
+#scoreboard {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: white;
+  font-weight: bold;
+  text-align: right;
 }
-
-.tab{
-  flex:1;
-  padding:10px;
-  text-align:center;
-  cursor:pointer;
-  border-right:1px solid #333;
-}
-
-.tab.active{
-  background:#444;
-}
-
-#panelContent{
-  flex:1;
-  overflow-y:auto;
-  padding:10px;
-}
-
-.section{
-  margin-bottom:20px;
-}
-
-select,input{
-  width:100%;
-  margin-top:5px;
-}
-
-button{
-  margin-top:6px;
-  width:100%;
-}
-
-#log{
-  background:#000;
-  padding:5px;
-  height:150px;
-  overflow-y:auto;
-  font-size:12px;
-}
-
 </style>
 </head>
-
 <body>
 
-<div id="map"></div>
-
-<div id="panel">
-
-  <div id="tabs">
-    <div class="tab active" onclick="openTab('units',event)">Units</div>
-    <div class="tab" onclick="openTab('missiles',event)">Missiles</div>
-    <div class="tab" onclick="openTab('nukes',event)">Nukes</div>
-  </div>
-
-  <div id="panelContent">
-
-    <div class="section">
-      <h3>Origin</h3>
-      <select id="originSelect"></select>
-
-      <h3>Target</h3>
-      <select id="targetSelect"></select>
-    </div>
-
-    <div id="unitsTab">
-      <h3>Troops</h3>
-      <input id="troopAmount" type="number" value="10">
-      <button onclick="sendUnits('troops')">Send Troops</button>
-
-      <h3>Planes ✈️</h3>
-      <input id="planeAmount" type="number" value="5">
-      <button onclick="sendUnits('planes')">Send Planes</button>
-
-      <h3>Ships 🚢</h3>
-      <input id="shipAmount" type="number" value="5">
-      <button onclick="sendUnits('ships')">Send Ships</button>
-    </div>
-
-    <div id="missilesTab" style="display:none">
-      <h3>Missile Strike 🚀</h3>
-      <button onclick="launchMissile()">Launch Missile</button>
-    </div>
-
-    <div id="nukesTab" style="display:none">
-      <h3>Nuclear Strike ☢️</h3>
-      <button onclick="launchNuke()">Launch Nuke</button>
-    </div>
-
-    <h3>Battle Log</h3>
-    <div id="log"></div>
-
-  </div>
-</div>
-
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<canvas id="gameCanvas"></canvas>
+<div id="ui">Health: <span id="health">100</span></div>
+<div id="scoreboard">Score: <span id="score">0</span></div>
 
 <script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-const map = L.map('map').setView([20,0],2);
+let keys = {};
+let score = 0;
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  maxZoom:6
-}).addTo(map);
+document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-let log=document.getElementById("log");
-
-function addLog(text){
-  log.innerHTML+="<div>"+text+"</div>";
-  log.scrollTop=log.scrollHeight;
-}
-
-// Countries
-const countries={
-  USA:[38,-97],
-  Brazil:[-10,-55],
-  UK:[54,-2],
-  India:[21,78],
-  Japan:[36,138],
-  Australia:[-25,133]
-};
-
-const originSelect=document.getElementById("originSelect");
-const targetSelect=document.getElementById("targetSelect");
-
-for(let c in countries){
-  let o=document.createElement("option");
-  o.value=c;
-  o.text=c;
-  originSelect.appendChild(o);
-
-  let t=document.createElement("option");
-  t.value=c;
-  t.text=c;
-  targetSelect.appendChild(t);
-}
-
-// Disable selecting origin as target
-originSelect.addEventListener('change',()=>{
-  for(let i=0;i<targetSelect.options.length;i++){
-    targetSelect.options[i].disabled = (targetSelect.options[i].value === originSelect.value);
+// Game objects
+class Plane {
+  constructor(x, y, color='blue', isPlayer=false){
+    this.x = x;
+    this.y = y;
+    this.width = 40;
+    this.height = 40;
+    this.angle = 0;
+    this.speed = 0;
+    this.maxSpeed = 5;
+    this.acceleration = 0.2;
+    this.rotationSpeed = 3; // degrees
+    this.color = color;
+    this.isPlayer = isPlayer;
+    this.health = 100;
+    this.reload = 0; // bullet cooldown
   }
-});
-
-// Tabs
-function openTab(name,event){
-  document.getElementById("unitsTab").style.display="none";
-  document.getElementById("missilesTab").style.display="none";
-  document.getElementById("nukesTab").style.display="none";
-
-  document.getElementById(name+"Tab").style.display="block";
-
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  event.target.classList.add("active");
-}
-
-// Send units
-function sendUnits(type){
-  let origin=countries[originSelect.value];
-  let target=countries[targetSelect.value];
-  let amount=0;
-
-  if(type==="troops") amount=document.getElementById("troopAmount").value;
-  if(type==="planes") amount=document.getElementById("planeAmount").value;
-  if(type==="ships") amount=document.getElementById("shipAmount").value;
-
-  if(type==="ships"){
-    animateShip(amount, origin, target);
-  } else {
-    animateAttack(type, amount, origin, target);
+  draw(){
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle * Math.PI / 180);
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.moveTo(20,0);
+    ctx.lineTo(-20,15);
+    ctx.lineTo(-15,0);
+    ctx.lineTo(-20,-15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    // Health bar
+    ctx.fillStyle = 'red';
+    ctx.fillRect(this.x-20, this.y-30, 40*(this.health/100), 5);
+    ctx.strokeStyle = 'black';
+    ctx.strokeRect(this.x-20, this.y-30, 40, 5);
   }
-}
-
-// Troops & planes animation
-function animateAttack(type,amount,origin,target){
-  let icon="⚔️";
-  if(type==="planes") icon="✈️";
-
-  let marker=L.marker(origin,{
-    icon:L.divIcon({html:icon,className:"",iconSize:[20,20]})
-  }).addTo(map);
-
-  let steps=80;
-  let i=0;
-  let latStep=(target[0]-origin[0])/steps;
-  let lngStep=(target[1]-origin[1])/steps;
-
-  let move=setInterval(()=>{
-    i++;
-    let lat=origin[0]+latStep*i;
-    let lng=origin[1]+lngStep*i;
-    marker.setLatLng([lat,lng]);
-
-    if(i>=steps){
-      clearInterval(move);
-      setTimeout(()=>marker.remove(),2000);
-
-      let impact=L.circle(target,{radius:50000,color:"orange"}).addTo(map);
-      setTimeout(()=>map.removeLayer(impact),500);
-
-      addLog(type+" attacked "+targetSelect.value+" with "+amount);
+  update(){
+    if(this.isPlayer){
+      // Controls: W/S accelerate, A/D rotate
+      if(keys['w']) this.speed += this.acceleration;
+      if(keys['s']) this.speed -= this.acceleration;
+      if(keys['a']) this.angle -= this.rotationSpeed;
+      if(keys['d']) this.angle += this.rotationSpeed;
+      if(this.speed > this.maxSpeed) this.speed = this.maxSpeed;
+      if(this.speed < -this.maxSpeed/2) this.speed = -this.maxSpeed/2;
+      // Move
+      this.x += Math.cos(this.angle * Math.PI / 180) * this.speed;
+      this.y += Math.sin(this.angle * Math.PI / 180) * this.speed;
+      // Boundaries
+      if(this.x<0) this.x=0;
+      if(this.y<0) this.y=0;
+      if(this.x>canvas.width) this.x=canvas.width;
+      if(this.y>canvas.height) this.y=canvas.height;
+      // Shooting
+      if(keys[' ']) this.shoot();
+    } else {
+      this.aiBehavior();
     }
-  },40);
+    if(this.reload>0) this.reload--;
+  }
+  shoot(){
+    if(this.reload === 0){
+      bullets.push(new Bullet(this.x, this.y, this.angle, this.isPlayer));
+      this.reload = 15; // cooldown
+    }
+  }
+  aiBehavior(){
+    // Simple AI: follow player and shoot
+    let dx = player.x - this.x;
+    let dy = player.y - this.y;
+    let targetAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+    let diff = (targetAngle - this.angle + 360) % 360;
+    if(diff > 180) this.angle -= this.rotationSpeed;
+    else this.angle += this.rotationSpeed;
+    if(this.angle>360) this.angle-=360;
+    if(this.angle<0) this.angle+=360;
+    // Move forward
+    this.speed = this.maxSpeed*0.7;
+    this.x += Math.cos(this.angle * Math.PI / 180) * this.speed;
+    this.y += Math.sin(this.angle * Math.PI / 180) * this.speed;
+    // Shoot occasionally
+    if(Math.random()<0.02) this.shoot();
+  }
 }
 
-// Ship routes (all country pairs)
-const shipRoutes = {
-  "USA>Brazil":[ [38,-97], [0,-70], [-10,-55] ],
-  "USA>UK":[ [38,-97], [50,-40], [54,-2] ],
-  "USA>India":[ [38,-97], [30,-40], [15,50], [21,78] ],
-  "USA>Japan":[ [38,-97], [40,160], [36,138] ],
-  "USA>Australia":[ [38,-97], [0,160], [-25,133] ],
+class Bullet {
+  constructor(x,y,angle,isPlayer){
+    this.x = x;
+    this.y = y;
+    this.angle = angle;
+    this.speed = 10;
+    this.radius = 4;
+    this.isPlayer = isPlayer;
+  }
+  draw(){
+    ctx.fillStyle = this.isPlayer?'yellow':'red';
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.radius,0,Math.PI*2);
+    ctx.fill();
+  }
+  update(){
+    this.x += Math.cos(this.angle * Math.PI / 180) * this.speed;
+    this.y += Math.sin(this.angle * Math.PI / 180) * this.speed;
+  }
+}
 
-  "Brazil>USA":[ [-10,-55], [0,-40], [38,-97] ],
-  "Brazil>UK":[ [-10,-55], [20,-40], [54,-2] ],
-  "Brazil>India":[ [-10,-55], [0,10], [21,78] ],
-  "Brazil>Japan":[ [-10,-55], [10,160], [36,138] ],
-  "Brazil>Australia":[ [-10,-55], [-10,150], [-25,133] ],
+class PowerUp {
+  constructor(x,y,type){
+    this.x=x;
+    this.y=y;
+    this.type=type;
+    this.radius=15;
+  }
+  draw(){
+    ctx.fillStyle = this.type==='health'?'green':'orange';
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.radius,0,Math.PI*2);
+    ctx.fill();
+  }
+}
 
-  "UK>USA":[ [54,-2], [50,-40], [38,-97] ],
-  "UK>Brazil":[ [54,-2], [20,-40], [-10,-55] ],
-  "UK>India":[ [54,-2], [40,40], [21,78] ],
-  "UK>Japan":[ [54,-2], [40,160], [36,138] ],
-  "UK>Australia":[ [54,-2], [0,150], [-25,133] ],
+// Player
+let player = new Plane(canvas.width/2, canvas.height-100, 'blue', true);
 
-  "India>USA":[ [21,78], [15,50], [38,-97] ],
-  "India>Brazil":[ [21,78], [0,10], [-10,-55] ],
-  "India>UK":[ [21,78], [40,40], [54,-2] ],
-  "India>Japan":[ [21,78], [30,100], [36,138] ],
-  "India>Australia":[ [21,78], [0,120], [-25,133] ],
+// Enemies
+let enemies = [];
+for(let i=0;i<5;i++){
+  enemies.push(new Plane(Math.random()*canvas.width, Math.random()*canvas.height/2, 'red'));
+}
 
-  "Japan>USA":[ [36,138], [40,160], [38,-97] ],
-  "Japan>Brazil":[ [36,138], [10,160], [-10,-55] ],
-  "Japan>UK":[ [36,138], [40,160], [54,-2] ],
-  "Japan>India":[ [36,138], [30,100], [21,78] ],
-  "Japan>Australia":[ [36,138], [0,150], [-25,133] ],
+// Bullets
+let bullets = [];
 
-  "Australia>USA":[ [-25,133], [0,160], [38,-97] ],
-  "Australia>Brazil":[ [-25,133], [-10,150], [-10,-55] ],
-  "Australia>UK":[ [-25,133], [0,150], [54,-2] ],
-  "Australia>India":[ [-25,133], [-5,100], [21,78] ],
-  "Australia>Japan":[ [-25,133], [0,150], [36,138] ]
-};
+// PowerUps
+let powerUps = [];
+function spawnPowerUp(){
+  let type = Math.random()<0.5?'health':'ammo';
+  powerUps.push(new PowerUp(Math.random()*canvas.width, Math.random()*canvas.height, type));
+}
+setInterval(spawnPowerUp,15000);
 
-// Ship animation
-function animateShip(amount, origin, target){
-  let key = originSelect.value + ">" + targetSelect.value;
-  let route = shipRoutes[key];
-  
-  if(!route){
-    addLog("No ship route defined for "+key);
-    return;
+// Game loop
+function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Draw clouds
+  for(let i=0;i<50;i++){
+    ctx.fillStyle='rgba(255,255,255,0.2)';
+    ctx.beginPath();
+    ctx.arc((i*100 + Date.now()/50)%canvas.width, 50 + ((i*30)%canvas.height/3), 30, 0, Math.PI*2);
+    ctx.fill();
   }
 
-  let marker=L.marker(origin,{
-    icon:L.divIcon({html:"🚢",className:"",iconSize:[20,20]})
-  }).addTo(map);
+  // Update and draw player
+  player.update();
+  player.draw();
 
-  let stepsPerSegment=40;
+  // Update and draw enemies
+  for(let e of enemies){
+    e.update();
+    e.draw();
+  }
 
-  function moveSegment(seg){
-    if(seg>=route.length-1){
-      setTimeout(()=>marker.remove(),2000);
-      let impact=L.circle(route[route.length-1],{radius:50000,color:"orange"}).addTo(map);
-      setTimeout(()=>map.removeLayer(impact),500);
+  // Update bullets
+  for(let i=bullets.length-1;i>=0;i--){
+    let b = bullets[i];
+    b.update();
+    b.draw();
+    // Remove if offscreen
+    if(b.x<0 || b.y<0 || b.x>canvas.width || b.y>canvas.height) bullets.splice(i,1);
 
-      addLog("Ships reached "+targetSelect.value+" with "+amount);
-      return;
-    }
-
-    let start = route[seg];
-    let end = route[seg+1];
-    let i=0;
-    let latStep=(end[0]-start[0])/stepsPerSegment;
-    let lngStep=(end[1]-start[1])/stepsPerSegment;
-
-    let interval=setInterval(()=>{
-      i++;
-      let lat=start[0]+latStep*i;
-      let lng=start[1]+lngStep*i;
-      marker.setLatLng([lat,lng]);
-      if(i>=stepsPerSegment){
-        clearInterval(interval);
-        moveSegment(seg+1);
+    // Check collision with enemies
+    if(b.isPlayer){
+      for(let j=enemies.length-1;j>=0;j--){
+        let e = enemies[j];
+        let dx = b.x - e.x;
+        let dy = b.y - e.y;
+        if(Math.sqrt(dx*dx+dy*dy)<e.width/2){
+          e.health -= 20;
+          bullets.splice(i,1);
+          if(e.health<=0){
+            enemies.splice(j,1);
+            score+=10;
+          }
+          break;
+        }
       }
-    },40);
+    } else {
+      // Enemy bullets hit player
+      let dx = b.x - player.x;
+      let dy = b.y - player.y;
+      if(Math.sqrt(dx*dx+dy*dy)<player.width/2){
+        player.health -= 10;
+        bullets.splice(i,1);
+      }
+    }
   }
 
-  moveSegment(0);
+  // Draw power-ups
+  for(let i=powerUps.length-1;i>=0;i--){
+    let p = powerUps[i];
+    p.draw();
+    let dx = p.x - player.x;
+    let dy = p.y - player.y;
+    if(Math.sqrt(dx*dx+dy*dy)<player.width/2 + p.radius){
+      if(p.type==='health') player.health=Math.min(player.health+30,100);
+      powerUps.splice(i,1);
+    }
+  }
+
+  // Update UI
+  document.getElementById('health').innerText = player.health;
+  document.getElementById('score').innerText = score;
+
+  requestAnimationFrame(loop);
 }
 
-// Missiles
-function launchMissile(){
-  let target=countries[targetSelect.value];
-  let missile=L.marker(target,{
-    icon:L.divIcon({html:"🚀",className:"",iconSize:[20,20]})
-  }).addTo(map);
-
-  addLog("Missile launched at "+targetSelect.value);
-  setTimeout(()=>map.removeLayer(missile),2000);
-}
-
-// Nukes
-function launchNuke(){
-  let target=countries[targetSelect.value];
-  let blast=L.circle(target,{
-    radius:600000,
-    color:"red"
-  }).addTo(map);
-
-  addLog("NUKE DETONATED on "+targetSelect.value+" ☢️");
-  setTimeout(()=>map.removeLayer(blast),2000);
-}
-
+loop();
 </script>
 
 </body>
