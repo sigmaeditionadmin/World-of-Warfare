@@ -3,7 +3,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Aircraft Simulator</title>
+<title>Jet Fighter Simulator</title>
 
 <style>
 body{margin:0;overflow:hidden;background:#87CEEB;}
@@ -25,7 +25,7 @@ border-radius:6px;
 
 <div id="hud">Speed: 0 | Altitude: 0</div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.157/build/three.min.js"></script>
 
 <script>
 
@@ -49,7 +49,7 @@ camera=new THREE.PerspectiveCamera(
 75,
 window.innerWidth/window.innerHeight,
 0.1,
-2000
+5000
 )
 
 renderer=new THREE.WebGLRenderer({antialias:true})
@@ -59,15 +59,15 @@ document.body.appendChild(renderer.domElement)
 const ambient=new THREE.AmbientLight(0xffffff,0.7)
 scene.add(ambient)
 
-const sun=new THREE.DirectionalLight(0xffffff,0.8)
-sun.position.set(50,100,20)
+const sun=new THREE.DirectionalLight(0xffffff,0.9)
+sun.position.set(100,200,100)
 scene.add(sun)
 
-createPlane()
+createJet()
 
 // ground
-const groundGeo=new THREE.PlaneGeometry(4000,4000)
-const groundMat=new THREE.MeshStandardMaterial({color:0x2f7d32})
+const groundGeo=new THREE.PlaneGeometry(6000,6000)
+const groundMat=new THREE.MeshStandardMaterial({color:0x2e8b57})
 const ground=new THREE.Mesh(groundGeo,groundMat)
 ground.rotation.x=-Math.PI/2
 scene.add(ground)
@@ -83,52 +83,71 @@ renderer.setSize(window.innerWidth,window.innerHeight)
 
 }
 
-function createPlane(){
+function createJet(){
 
 plane=new THREE.Group()
 
 // fuselage
-const bodyGeo=new THREE.CylinderGeometry(.3,.4,6,16)
-const bodyMat=new THREE.MeshStandardMaterial({color:0xdddddd})
-const body=new THREE.Mesh(bodyGeo,bodyMat)
+const body=new THREE.Mesh(
+new THREE.CylinderGeometry(.5,.5,8,20),
+new THREE.MeshStandardMaterial({color:0xcccccc})
+)
 body.rotation.z=Math.PI/2
 plane.add(body)
 
 // nose
-const noseGeo=new THREE.ConeGeometry(.35,1,16)
-const nose=new THREE.Mesh(noseGeo,new THREE.MeshStandardMaterial({color:0x444444}))
+const nose=new THREE.Mesh(
+new THREE.ConeGeometry(.5,2,20),
+new THREE.MeshStandardMaterial({color:0x333333})
+)
 nose.rotation.z=-Math.PI/2
-nose.position.x=3.5
+nose.position.x=5
 plane.add(nose)
 
 // wings
-const wingGeo=new THREE.BoxGeometry(8,.15,1.5)
-const wing=new THREE.Mesh(wingGeo,new THREE.MeshStandardMaterial({color:0x888888}))
-plane.add(wing)
+const wingShape=new THREE.Shape()
+wingShape.moveTo(0,0)
+wingShape.lineTo(4,1)
+wingShape.lineTo(4,-1)
+wingShape.lineTo(0,0)
 
-// tail wing
-const tailWingGeo=new THREE.BoxGeometry(3,.1,.7)
-const tailWing=new THREE.Mesh(tailWingGeo,new THREE.MeshStandardMaterial({color:0x888888}))
-tailWing.position.x=-2.5
+const wingGeo=new THREE.ExtrudeGeometry(wingShape,{depth:.2,bevelEnabled:false})
+
+const wing1=new THREE.Mesh(wingGeo,new THREE.MeshStandardMaterial({color:0x999999}))
+wing1.position.set(0,0,0)
+wing1.rotation.y=Math.PI/2
+plane.add(wing1)
+
+const wing2=wing1.clone()
+wing2.rotation.y=-Math.PI/2
+plane.add(wing2)
+
+// tail wings
+const tailWing=new THREE.Mesh(
+new THREE.BoxGeometry(2,.1,.7),
+new THREE.MeshStandardMaterial({color:0xaaaaaa})
+)
+tailWing.position.x=-3
 plane.add(tailWing)
 
 // vertical tail
-const tailGeo=new THREE.BoxGeometry(.1,1.2,1)
-const tail=new THREE.Mesh(tailGeo,new THREE.MeshStandardMaterial({color:0x777777}))
-tail.position.set(-3,.7,0)
-plane.add(tail)
+const vTail=new THREE.Mesh(
+new THREE.BoxGeometry(.2,1.5,1),
+new THREE.MeshStandardMaterial({color:0x888888})
+)
+vTail.position.set(-3,.8,0)
+plane.add(vTail)
 
 // cockpit
-const cockpitGeo=new THREE.SphereGeometry(.45,16,16)
 const cockpit=new THREE.Mesh(
-cockpitGeo,
-new THREE.MeshStandardMaterial({color:0x222222})
+new THREE.SphereGeometry(.6,20,20),
+new THREE.MeshStandardMaterial({color:0x111111})
 )
 cockpit.scale.set(1,.5,1)
-cockpit.position.set(1,.4,0)
+cockpit.position.set(2,.5,0)
 plane.add(cockpit)
 
-plane.position.y=5
+plane.position.y=10
 scene.add(plane)
 
 }
@@ -149,8 +168,8 @@ renderer.render(scene,camera)
 
 function handleControls(delta){
 
-const accel=25
-const rotSpeed=1.5
+const accel=40
+const rotSpeed=1.6
 
 if(keys["KeyW"]) velocity+=accel*delta
 if(keys["KeyS"]) velocity-=accel*delta
@@ -175,13 +194,12 @@ plane.position.add(forward.multiplyScalar(velocity*delta))
 
 function updateCamera(){
 
-// farther behind plane so you see it
-let offset=new THREE.Vector3(-20,8,0)
+let offset=new THREE.Vector3(-25,10,0)
 offset.applyEuler(plane.rotation)
 
 camera.position.copy(plane.position).add(offset)
 
-let look=new THREE.Vector3(15,0,0)
+let look=new THREE.Vector3(20,0,0)
 look.applyEuler(plane.rotation)
 look.add(plane.position)
 
